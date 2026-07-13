@@ -17,35 +17,51 @@ func main() {
 		log.Fatalf("Error loading .env file: %v", err)
 	}
 
-	PORT := os.Getenv("PORT")
-	fmt.Printf("Listeneing on port %s", PORT)
-
-	listener, err := net.Listen("tcp", ":"+PORT)
-	if err != nil {
-		fmt.Printf("Error listening on port %s: %v", PORT, err)
-		return
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
 	}
 
-	conn, err := listener.Accept()
+	listener, err := net.Listen("tcp", ":"+port)
 	if err != nil {
-		fmt.Printf("Error accepting connection: %v", err)
-		return
+		log.Fatalf("Error listening on port %s: %v", port, err)
 	}
+	defer listener.Close()
 
-	defer conn.Close()
+	fmt.Printf("Listening on port %s...\n", port)
 
 	for {
-		buf := make([]byte, 1024)
+		conn, err := listener.Accept()
+		if err != nil {
+			fmt.Printf("Error accepting connection: %v\n", err)
+			continue
+		}
 
-		_, err = conn.Read(buf)
+		go handleConnection(conn)
+	}
+}
+
+func handleConnection(conn net.Conn) {
+	defer conn.Close()
+
+	buf := make([]byte, 1024)
+
+	for {
+		n, err := conn.Read(buf)
 		if err != nil {
 			if err == io.EOF {
 				break
 			}
-			fmt.Printf("Error reading from connection: %v", err)
-			os.Exit(1)
+			fmt.Printf("Error reading from connection: %v\n", err)
+			return
 		}
-		answer := lexer.ReadStream(buf)
-		conn.Write([]byte(answer))
+
+		answer := lexer.ReadManager(buf[:n])
+
+		_, err = conn.Write([]byte(answer))
+		if err != nil {
+			fmt.Printf("Error writing to connection: %v\n", err)
+			return
+		}
 	}
 }

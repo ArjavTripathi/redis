@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"redis/src/lexer"
 
 	"github.com/joho/godotenv"
 )
@@ -44,7 +45,7 @@ func main() {
 			fmt.Printf("Error reading from connection: %v", err)
 			os.Exit(1)
 		}
-
-		conn.Write([]byte("OK\r\n"))
+		answer := lexer.ReadStream(buf)
+		conn.Write([]byte(answer))
 	}
 }

@@ -11,6 +11,11 @@ func TestManageArray(t *testing.T) {
 		{ //"*3$3SET$5mykey$5hello"
 			name:  "SET example",
 			input: []byte("*1\r\n$3\r\nSET"),
+			want:  "SET",
+		},
+		{ //"*3$3SET$5mykey$5hello"
+			name:  "SET full example",
+			input: []byte("*3\r\n$3\r\nSET\r\n$5\r\nmykey\r\n$5\r\nhello"),
 			want:  "SET mykey hello",
 		},
 	}

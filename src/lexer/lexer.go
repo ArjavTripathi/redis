@@ -2,17 +2,20 @@ package lexer
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
 
 func manageArray(stream []byte) string {
-	noOfCommands := int(stream[0] - '0')
+	stringRep := string(stream)
+	noOfCommands := int(stream[1] - '0')
+	fmt.Println(stringRep)
 
 	if noOfCommands == 0 {
 		return ""
 	}
 	commandCounter := 0
-	i := 1
+	i := 2
 	var returnString []string
 
 	for commandCounter < noOfCommands {
@@ -25,7 +28,24 @@ func manageArray(stream []byte) string {
 		}
 
 		if stream[i] == '$' {
-			
+			commandCounter++
+			i++
+			var sizeString strings.Builder
+			for stream[i] != '\r' {
+				sizeString.WriteByte(stream[i])
+				i++
+			}
+			i += 2
+			size, err := strconv.Atoi(sizeString.String())
+			if err != nil {
+				return fmt.Sprintln(err)
+			}
+			var sb strings.Builder
+			for j := i; j < size+i; j++ {
+				sb.WriteByte(stream[j])
+			}
+			returnString = append(returnString, sb.String())
+			i = i + size
 		}
 	}
 

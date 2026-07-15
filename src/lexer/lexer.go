@@ -65,6 +65,29 @@ func handleInteger(stream []byte, index *int) commands.Token {
 
 }
 
+func handleNull() commands.Token {
+	return commands.Token{
+		Type: NULL,
+	}
+}
+
+func handleBoolean(stream []byte, index *int) commands.Token {
+	var sb strings.Builder
+	var b bool
+	if stream[*index] == 't' {
+		sb.WriteString("true")
+		b = true
+	} else if stream[*index] == 'f' {
+		sb.WriteString("false")
+		b = false
+	}
+	*index++
+	return commands.Token{
+		Type: BOOLEAN,
+		Bool: b,
+	}
+}
+
 func manageArray(stream []byte) commands.Token {
 	noOfCommands := int(stream[1] - '0')
 	if noOfCommands == 0 {
@@ -100,29 +123,14 @@ func manageArray(stream []byte) commands.Token {
 			token.Array = append(token.Array, inttoken)
 		} else if stream[i] == NULL {
 			commandCounter++
-			nullToken := commands.Token{
-				Type: NULL,
-			}
-			token.Array = append(token.Array, nullToken)
 			i++
+			nullToken := handleNull()
+			token.Array = append(token.Array, nullToken)
 		} else if stream[i] == BOOLEAN {
 			i++
-			var sb strings.Builder
-			var b bool
-			if stream[i] == 't' {
-				sb.WriteString("true")
-				b = true
-			} else if stream[i] == 'f' {
-				sb.WriteString("false")
-				b = false
-			}
-
-			boolToken := commands.Token{
-				Type: BOOLEAN,
-				Bool: b,
-			}
+			commandCounter++
+			boolToken := handleBoolean(stream, &i)
 			token.Array = append(token.Array, boolToken)
-			i++
 		} else if stream[i] == DOUBLE {
 			//i++
 			//var symbol *byte
@@ -137,12 +145,18 @@ func manageArray(stream []byte) commands.Token {
 	return token
 }
 
-//func ReadManager(stream []byte) string {
-//	dataType := stream[0]
-//	var token commands.Token
-//	if dataType == BULK {
-//		token = manageArray(stream)
-//	}
-//
-//	return "_\r\n"
-//}
+func ReadManager(stream []byte) commands.Token {
+	dataType := stream[0]
+	var token commands.Token
+	if dataType == BULK {
+		token = handleBulkStrings(stream, new(1))
+	} else if dataType == INTEGER {
+		token = handleInteger(stream, new(1))
+	} else if dataType == NULL {
+		token = handleNull()
+	} else if dataType == ARRAY {
+		token = manageArray(stream)
+	}
+
+	return token
+}

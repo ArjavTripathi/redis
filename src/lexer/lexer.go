@@ -1,9 +1,7 @@
 package lexer
 
 import (
-	"fmt"
 	"redis/src/commands"
-	"strconv"
 	"strings"
 )
 
@@ -19,24 +17,71 @@ const (
 	DOUBLE  = ','
 )
 
-func manageArray(stream []byte) string {
+func handleBulkStrings(stream []byte, index *int) commands.Token {
+	i := 0
+	sb := strings.Builder{}
+	for stream[*index] != SKIP {
+		i = 10*i + int(stream[*index]-'0')
+		*index++
+	}
+	*index += 2
+	for j := 0; j < i; j++ {
+		sb.WriteByte(stream[*index])
+		*index++
+	}
+	*index += 2
+	token := commands.Token{
+		Type: BULK,
+		Str:  sb.String(),
+	}
+	return token
+}
+
+func handleInteger(stream []byte, index *int) commands.Token {
+	toNegate := false
+	val := 0
+	sym := '+'
+	for stream[*index] != SKIP {
+		if stream[*index] == '-' {
+			toNegate = true
+			sym = '-'
+			*index++
+			continue
+		}
+		val = val*10 + int(stream[*index]-'0')
+		*index++
+	}
+
+	if toNegate {
+		val *= -1
+	}
+
+	inttoken := commands.Token{
+		Type:   INTEGER,
+		Num:    val,
+		Symbol: sym,
+	}
+	return inttoken
+
+}
+
+func manageArray(stream []byte) commands.Token {
 	noOfCommands := int(stream[1] - '0')
 	if noOfCommands == 0 {
-		return ""
+		return commands.ErrorToken("0 commands found in Array")
 	}
 
 	token := commands.Token{
 		Type:  ARRAY,
 		Num:   noOfCommands,
-		Array: make([]commands.Token, noOfCommands),
+		Array: make([]commands.Token, 0, noOfCommands),
 	}
 
 	commandCounter := 0
 	i := 2
-	var returnString []string
 
 	for commandCounter < noOfCommands {
-		if i == len(stream) {
+		if i >= len(stream) {
 			break
 		}
 		if stream[i] == SKIP {
@@ -46,56 +91,19 @@ func manageArray(stream []byte) string {
 		if stream[i] == BULK {
 			commandCounter++
 			i++
-			var sizeString strings.Builder
-			for stream[i] != '\r' {
-				sizeString.WriteByte(stream[i])
-				i++
-			}
-			i += 2
-			size, err := strconv.Atoi(sizeString.String())
-			if err != nil {
-				return fmt.Sprintln(err)
-			}
-			var sb strings.Builder
-			for j := i; j < size+i; j++ {
-				sb.WriteByte(stream[j])
-			}
-			returnString = append(returnString, sb.String())
-			i += size
-			bulktoken := commands.Token{
-				Type: BULK,
-				Str:  sb.String(),
-			}
+			bulktoken := handleBulkStrings(stream, &i)
 			token.Array = append(token.Array, bulktoken)
 		} else if stream[i] == INTEGER {
 			commandCounter++
 			i++
-			var sb strings.Builder
-			var sym byte
-			for stream[i] != '\r' {
-				if stream[i] == '-' || stream[i] == '+' {
-					sym = stream[i]
-				}
-				sb.WriteByte(stream[i])
-				i++
-			}
-			val, err := strconv.Atoi(sb.String())
-			if err != nil {
-				return fmt.Sprintln(err)
-			}
-
-			returnString = append(returnString, sb.String())
-
-			inttoken := commands.Token{
-				Type:   INTEGER,
-				Num:    val,
-				Symbol: sym,
-			}
-			token.Array = append(token.Array, inttoken)
+			inttoken := handleInteger(stream, &i)
 			token.Array = append(token.Array, inttoken)
 		} else if stream[i] == NULL {
 			commandCounter++
-			returnString = append(returnString, "NULL")
+			nullToken := commands.Token{
+				Type: NULL,
+			}
+			token.Array = append(token.Array, nullToken)
 			i++
 		} else if stream[i] == BOOLEAN {
 			i++
@@ -114,7 +122,6 @@ func manageArray(stream []byte) string {
 				Bool: b,
 			}
 			token.Array = append(token.Array, boolToken)
-			returnString = append(returnString, sb.String())
 			i++
 		} else if stream[i] == DOUBLE {
 			//i++
@@ -127,28 +134,15 @@ func manageArray(stream []byte) string {
 		}
 	}
 
-	return strings.Join(returnString, " ")
+	return token
 }
 
-func ReadManager(stream []byte) string {
-	dataType := stream[0]
-	var text string
-
-	if dataType == STRING {
-		text := string(stream[1 : len(stream)-2])
-		if text == "PING" {
-			return commands.Handler("PING", make([]commands.Token, 0))
-		}
-		return fmt.Sprintf("+%s\r\n", text)
-	} else if dataType == INTEGER {
-		if stream[1] == '+' {
-			text = string(stream[2 : len(stream)-2])
-		} else if stream[1] == ERROR {
-			text = fmt.Sprintf(":-%s\r\n", string(stream[2:len(stream)-2]))
-		} else if stream[1] == ARRAY {
-			text = manageArray(stream[2 : len(stream)-1])
-		}
-		return text
-	}
-	return "_\r\n"
-}
+//func ReadManager(stream []byte) string {
+//	dataType := stream[0]
+//	var token commands.Token
+//	if dataType == BULK {
+//		token = manageArray(stream)
+//	}
+//
+//	return "_\r\n"
+//}

@@ -1,17 +1,21 @@
 package commands
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 )
 
-func Handler(instruction string, args []Token) string {
-	handler := map[string]func(*Store, []Token) string{
-		"PING": ping,
-		"SET":  set,
-	}
-	return handler[instruction](newStore(), args)
-}
+const (
+	STRING  = '+'
+	ERROR   = '-'
+	INTEGER = ':'
+	BULK    = '$'
+	ARRAY   = '*'
+	NULL    = '_'
+	BOOLEAN = '#'
+	DOUBLE  = ','
+)
 
 type Data struct {
 	data string
@@ -20,6 +24,44 @@ type Data struct {
 type Store struct {
 	mu    sync.RWMutex
 	cache map[string]Data
+}
+
+type Server struct {
+	store *Store
+}
+
+func NewServer() *Server {
+	return &Server{
+		store: &Store{
+			cache: make(map[string]Data),
+			mu:    sync.RWMutex{},
+		},
+	}
+}
+
+func (srv *Server) Handler(args []Token) (string, error) {
+
+	numTokens := len(args)
+	if numTokens == 0 {
+		return "", errors.New("Missing tokens in handler")
+	}
+	instruction := args[0].Str
+	handler := map[string]func(*Store, []Token) (string, error){
+		"SET": srv.set,
+	}
+	return handler[instruction](newStore(), args)
+}
+
+func ping(s *Store, args []Token) (string, error) {
+	return "+PONG\r\n", nil
+}
+func (srv *Server) set(s *Store, args []Token) (string, error) {
+
+	if len(args) != 3 {
+		return "", errors.New("Wrong number of arguments for the set operation")
+	}
+
+	return "what", nil
 }
 
 func newStore() *Store {
@@ -80,15 +122,18 @@ func (t Token) String() string {
 
 func ErrorToken(errorMessage string) Token {
 	return Token{
-		Type: '-',
+		Type: ERROR,
 		Str:  errorMessage,
 	}
 }
 
-func ping(s *Store, args []Token) string {
-	return "+PONG\r\n"
+func (t Token) array(s *Store, commands []Token) (string, error) {
+	return "", nil
 }
-func set(s *Store, args []Token) string {
 
-	return "what"
+func CreateStringToken(str string) Token {
+	return Token{
+		Type: STRING,
+		Str:  str,
+	}
 }

@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"redis/src/commands"
 	"redis/src/lexer"
 
 	"github.com/joho/godotenv"
@@ -28,6 +29,8 @@ func main() {
 	}
 	defer listener.Close()
 
+	server := commands.NewServer()
+
 	fmt.Printf("Listening on port %s...\n", port)
 
 	for {
@@ -37,11 +40,11 @@ func main() {
 			continue
 		}
 
-		go handleConnection(conn)
+		go handleConnection(server, conn)
 	}
 }
 
-func handleConnection(conn net.Conn) {
+func handleConnection(server *commands.Server, conn net.Conn) {
 	defer conn.Close()
 
 	buf := make([]byte, 1024)
@@ -56,7 +59,7 @@ func handleConnection(conn net.Conn) {
 			return
 		}
 
-		answer := lexer.ReadManager(buf[:n])
+		answer := lexer.ReadManager(server, buf[:n])
 
 		_, err = conn.Write([]byte(answer))
 		if err != nil {

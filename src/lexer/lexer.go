@@ -145,7 +145,7 @@ func manageArray(stream []byte) commands.Token {
 	return token
 }
 
-func ReadManager(stream []byte) commands.Token {
+func ReadManager(srv *commands.Server, stream []byte) commands.Token {
 	dataType := stream[0]
 	var token commands.Token
 	if dataType == BULK {
@@ -158,5 +158,10 @@ func ReadManager(stream []byte) commands.Token {
 		token = manageArray(stream)
 	}
 
-	return token
+	handler, err := srv.Handler([]commands.Token{token})
+	if err != nil {
+		return commands.ErrorToken(err.Error())
+	}
+
+	return commands.CreateStringToken(handler)
 }

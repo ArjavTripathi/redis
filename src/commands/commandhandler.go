@@ -3,6 +3,7 @@ package commands
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"sync"
 )
 
@@ -46,22 +47,51 @@ func (srv *Server) Handler(args []Token) (string, error) {
 		return "", errors.New("Missing tokens in handler")
 	}
 	instruction := args[0].Str
-	handler := map[string]func(*Store, []Token) (string, error){
+	handler := map[string]func([]Token) (string, error){
 		"SET": srv.set,
+		"GET": srv.get,
 	}
-	return handler[instruction](newStore(), args)
+	return handler[instruction](args)
 }
 
-func ping(s *Store, args []Token) (string, error) {
+func ping(args []Token) (string, error) {
 	return "+PONG\r\n", nil
 }
-func (srv *Server) set(s *Store, args []Token) (string, error) {
 
+func (srv *Server) get(args []Token) (string, error) {
+	if len(args) != 2 {
+		return "", errors.New("Wrong number of arguments for the get operation")
+	}
+
+	if args[1].Type != BULK {
+		return "", errors.New("Wrong type for the key value")
+	}
+
+	srv.store.mu.RLock()
+	defer srv.store.mu.RUnlock()
+
+	value, ok := srv.store.cache[args[1].Str]
+	if !ok {
+		return "", errors.New("Key not found")
+	}
+	return value.data, nil
+}
+
+func (srv *Server) set(args []Token) (string, error) {
 	if len(args) != 3 {
 		return "", errors.New("Wrong number of arguments for the set operation")
 	}
 
-	return "what", nil
+	if args[1].Type != BULK {
+		return "", errors.New("Wrong type for the key value")
+	}
+
+	srv.store.mu.RLock()
+	defer srv.store.mu.RUnlock()
+
+	srv.store.cache[args[1].Str] = Data{data: args[2].getValue()}
+
+	return "success", nil
 }
 
 func newStore() *Store {
@@ -77,6 +107,20 @@ type Token struct {
 	Str    string
 	Symbol int32
 	Array  []Token
+}
+
+func (t Token) getValue() string {
+	switch t.Type {
+	case STRING:
+		return t.Str
+	case INTEGER:
+		return fmt.Sprintf("%d", t.Num)
+	case BULK:
+		return t.Str
+	case BOOLEAN:
+		return strconv.FormatBool(t.Bool)
+	}
+	return ""
 }
 
 func (t Token) Equals(other Token) bool {

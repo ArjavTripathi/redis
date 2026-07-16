@@ -60,11 +60,11 @@ func ping(args []Token) (string, error) {
 
 func (srv *Server) get(args []Token) (string, error) {
 	if len(args) != 2 {
-		return "", errors.New("Wrong number of arguments for the get operation")
+		return "", errors.New("wrong number of arguments for the get operation")
 	}
 
 	if args[1].Type != BULK {
-		return "", errors.New("Wrong type for the key value")
+		return "", errors.New("wrong type for the key value")
 	}
 
 	srv.store.mu.RLock()
@@ -72,18 +72,18 @@ func (srv *Server) get(args []Token) (string, error) {
 
 	value, ok := srv.store.cache[args[1].Str]
 	if !ok {
-		return "", errors.New("Key not found")
+		return "", errors.New("key not found")
 	}
 	return value.data, nil
 }
 
 func (srv *Server) set(args []Token) (string, error) {
 	if len(args) != 3 {
-		return "", errors.New("Wrong number of arguments for the set operation")
+		return "", errors.New("wrong number of arguments for the set operation")
 	}
 
 	if args[1].Type != BULK {
-		return "", errors.New("Wrong type for the key value")
+		return "", errors.New("wrong type for the key value")
 	}
 
 	srv.store.mu.RLock()
